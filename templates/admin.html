@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FarmGuard Admin Panel</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background: #f0fdf4;
+            font-family: 'Poppins', sans-serif;
+        }
+        .navbar {
+            background-color: #198754;
+        }
+        .navbar-brand, .nav-link, .navbar-text {
+            color: white !important;
+        }
+        .container {
+            margin-top: 40px;
+        }
+        .card {
+            border-radius: 12px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h3 {
+            color: #198754;
+            font-weight: 600;
+        }
+        table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th {
+            background-color: #198754;
+            color: white;
+        }
+        td {
+            vertical-align: middle;
+        }
+        a.btn-danger {
+            font-size: 14px;
+            padding: 4px 10px;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">🌿 FarmGuard Admin</a>
+        <div class="navbar-nav ms-auto">
+            <a class="nav-link" href="{{ url_for('dashboard') }}">User Dashboard</a>
+            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+
+    <div class="card p-4">
+        <h3 class="mb-3">👥 Registered Users</h3>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Admin</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>
+                                {% if user.is_admin %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not user.is_admin %}
+                                    <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-danger btn-sm">Delete</a>
+                                {% else %}
+                                    <span class="text-muted">Protected</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card p-4">
+        <h3 class="mb-3">📊 All Predictions</h3>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Image</th>
+                        <th>Prediction</th>
+                        <th>Recommendation</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                        <tr>
+                            <td>{{ record.id }}</td>
+                            <td>{{ record.user.username }}</td>
+                            <td>
+                                <img src="{{ url_for('uploaded_file', filename=record.filename) }}" width="80" class="rounded">
+                            </td>
+                            <td>{{ record.prediction }}</td>
+                            <td>{{ record.recommendation }}</td>
+                            <td>{{ record.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>
