@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
+from PIL import Image
 
 # -------------------------------------
 # 🏗️ App Configuration
@@ -27,7 +28,7 @@ login_manager.login_view = "login"
 login_manager.init_app(app)
 
 # -------------------------------------
-# 🧩 Models
+# 🧩 Database Models
 # -------------------------------------
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -37,6 +38,7 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     histories = db.relationship("History", backref="user", lazy=True)
 
+
 class History(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(200))
@@ -45,6 +47,7 @@ class History(db.Model):
     date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
+
 # -------------------------------------
 # 🔒 Login Manager
 # -------------------------------------
@@ -52,11 +55,12 @@ class History(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+
 # -------------------------------------
-# 🧠 Load ML Model
+# 🧠 Load Model
 # -------------------------------------
-MODEL_PATH = "tobacco_mobilenetv2.h5"
-model = load_model(MODEL_PATH)
+MODEL_PATH = "tobacco_mobilenetv2.keras"
+model = load_model(MODEL_PATH, compile=False)
 
 CLASS_LABELS = [
     "Anthracnose",
@@ -68,48 +72,26 @@ CLASS_LABELS = [
 ]
 
 # -------------------------------------
-# 🧮 Helper Functions
+# 🧮 Prediction Helper
 # -------------------------------------
-def is_blurry_or_dark(image_path, blur_thresh=100, dark_thresh=50):
-    """Check if image is too blurry or dark."""
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    if img is None:
-        return True
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blur = cv2.Laplacian(gray, cv2.CV_64F).var()
-    brightness = np.mean(gray)
-
-    if blur < blur_thresh or brightness < dark_thresh:
-        return True
-    return False
-
-
-def is_likely_leaf(image_path):
-    """Basic leaf detection based on green color percentage."""
-    img = cv2.imread(image_path)
-    if img is None:
-        return False
-
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    lower_green = np.array([25, 40, 40])
-    upper_green = np.array([95, 255, 255])
-    mask = cv2.inRange(hsv, lower_green, upper_green)
-    green_ratio = (cv2.countNonZero(mask) / (img.size / 3)) * 100
-    return green_ratio > 5  # at least 5% green
-
-
 def predict_disease(image_path):
-    img = image.load_img(image_path, target_size=(224, 224))
-    img_array = image.img_to_array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+    try:
+        img = image.load_img(image_path, target_size=(224, 224))
+        img_array = image.img_to_array(img) / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
 
-    preds = model.predict(img_array)
-    label_index = np.argmax(preds)
-    confidence = float(np.max(preds)) * 100
-    label = CLASS_LABELS[label_index]
+        preds = model.predict(img_array)
+        label_index = np.argmax(preds)
+        confidence = float(np.max(preds)) * 100
+        label = CLASS_LABELS[label_index]
 
-    return label, confidence
+        # sanity check — reject non-tobacco images
+        if confidence < 60:
+            return "Invalid Image", confidence
+        return label, confidence
+    except Exception as e:
+        print("Prediction error:", e)
+        return "Error", 0
 
 
 def get_recommendation(label):
@@ -120,8 +102,11 @@ def get_recommendation(label):
         "Tobacco_Mosaic_Virus": "Remove infected plants, sanitize tools.",
         "Wildfire": "Use copper bactericide, ensure proper spacing.",
         "Healthy": "Plant is healthy — maintain care routine.",
+        "Invalid Image": "Please upload a clear photo of a tobacco leaf for accurate diagnosis.",
+        "Error": "An error occurred during analysis."
     }
     return recommendations.get(label, "No recommendation available.")
+
 
 # -------------------------------------
 # 🌐 Routes
@@ -130,7 +115,8 @@ def get_recommendation(label):
 def home():
     return render_template("index.html")
 
-# ------------------ Registration ------------------
+
+# ------------------ Register ------------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -152,6 +138,7 @@ def register():
 
     return render_template("register.html")
 
+
 # ------------------ Login ------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -162,13 +149,14 @@ def login():
 
         if user and check_password_hash(user.password, password):
             login_user(user)
-            flash("Welcome back, " + user.username + "!", "success")
+            flash(f"Welcome back, {user.username}!", "success")
             return redirect(url_for("dashboard"))
         else:
             flash("Invalid credentials. Try again.", "danger")
             return redirect(url_for("login"))
 
     return render_template("login.html")
+
 
 # ------------------ Logout ------------------
 @app.route("/logout")
@@ -178,36 +166,19 @@ def logout():
     flash("You have been logged out.", "info")
     return redirect(url_for("home"))
 
+
 # ------------------ Dashboard ------------------
 @app.route("/dashboard", methods=["GET", "POST"])
 @login_required
 def dashboard():
     if request.method == "POST":
-        file = request.files["image"]
+        file = request.files.get("image")
         if file:
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
             file.save(filepath)
 
-            # --- 🧠 Validate image before prediction ---
-            if is_blurry_or_dark(filepath):
-                flash("⚠️ Image is too blurry or dark. Please upload a clearer photo.", "warning")
-                os.remove(filepath)
-                return redirect(url_for("dashboard"))
-
-            if not is_likely_leaf(filepath):
-                flash("🚫 The uploaded image doesn't look like a tobacco leaf. Please upload a valid leaf image.", "danger")
-                os.remove(filepath)
-                return redirect(url_for("dashboard"))
-
-            # --- Prediction ---
             label, confidence = predict_disease(filepath)
-
-            if confidence < 50:
-                flash("⚠️ The uploaded image doesn't seem to be a tobacco leaf. Please try again with a clearer leaf photo.", "warning")
-                os.remove(filepath)
-                return redirect(url_for("dashboard"))
-
             recommendation = get_recommendation(label)
 
             history = History(
@@ -219,11 +190,19 @@ def dashboard():
             db.session.add(history)
             db.session.commit()
 
-            return render_template("dashboard.html", label=label, confidence=confidence,
-                                   recommendation=recommendation, image_file=filename)
+            flash(f"Prediction: {label}", "success")
+            return render_template(
+                "dashboard.html",
+                label=label,
+                confidence=confidence,
+                recommendation=recommendation,
+                image_file=filename,
+                histories=History.query.filter_by(user_id=current_user.id).order_by(History.date.desc()).all()
+            )
 
     histories = History.query.filter_by(user_id=current_user.id).order_by(History.date.desc()).all()
     return render_template("dashboard.html", histories=histories)
+
 
 # ------------------ Delete History ------------------
 @app.route("/delete_record/<int:record_id>")
@@ -239,6 +218,7 @@ def delete_record(record_id):
     flash("Record deleted successfully.", "success")
     return redirect(url_for("dashboard"))
 
+
 # ------------------ Admin Dashboard ------------------
 @app.route("/admin")
 @login_required
@@ -250,6 +230,7 @@ def admin_dashboard():
     records = History.query.all()
     users = User.query.all()
     return render_template("admin.html", records=records, users=users)
+
 
 # ------------------ Admin Delete User ------------------
 @app.route("/admin/delete_user/<int:user_id>")
@@ -271,10 +252,12 @@ def delete_user(user_id):
     flash(f"User '{user.username}' deleted successfully.", "success")
     return redirect(url_for("admin_dashboard"))
 
-# ------------------ Uploaded Image Access ------------------
+
+# ------------------ Uploaded Images ------------------
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
 
 # -------------------------------------
 # 🚀 Run Server
