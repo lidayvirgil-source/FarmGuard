@@ -37,6 +37,7 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     histories = db.relationship("History", backref="user", lazy=True)
 
+
 class History(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(200))
@@ -45,12 +46,14 @@ class History(db.Model):
     date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
+
 # -------------------------------------
 # 🔒 Login Manager
 # -------------------------------------
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
 
 # -------------------------------------
 # 🧠 Load ML Model
@@ -123,12 +126,14 @@ def get_recommendation(label):
     }
     return recommendations.get(label, "No recommendation available.")
 
+
 # -------------------------------------
 # 🌐 Routes
 # -------------------------------------
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 # ------------------ Registration ------------------
 @app.route("/register", methods=["GET", "POST"])
@@ -152,6 +157,7 @@ def register():
 
     return render_template("register.html")
 
+
 # ------------------ Login ------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -170,6 +176,7 @@ def login():
 
     return render_template("login.html")
 
+
 # ------------------ Logout ------------------
 @app.route("/logout")
 @login_required
@@ -177,6 +184,7 @@ def logout():
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for("home"))
+
 
 # ------------------ Dashboard ------------------
 @app.route("/dashboard", methods=["GET", "POST"])
@@ -225,6 +233,7 @@ def dashboard():
     histories = History.query.filter_by(user_id=current_user.id).order_by(History.date.desc()).all()
     return render_template("dashboard.html", histories=histories)
 
+
 # ------------------ Delete History ------------------
 @app.route("/delete_record/<int:record_id>")
 @login_required
@@ -239,6 +248,7 @@ def delete_record(record_id):
     flash("Record deleted successfully.", "success")
     return redirect(url_for("dashboard"))
 
+
 # ------------------ Admin Dashboard ------------------
 @app.route("/admin")
 @login_required
@@ -250,6 +260,7 @@ def admin_dashboard():
     records = History.query.all()
     users = User.query.all()
     return render_template("admin.html", records=records, users=users)
+
 
 # ------------------ Admin Delete User ------------------
 @app.route("/admin/delete_user/<int:user_id>")
@@ -271,10 +282,12 @@ def delete_user(user_id):
     flash(f"User '{user.username}' deleted successfully.", "success")
     return redirect(url_for("admin_dashboard"))
 
+
 # ------------------ Uploaded Image Access ------------------
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
 
 # -------------------------------------
 # 🚀 Run Server
@@ -285,3 +298,29 @@ if __name__ == "__main__":
             db.create_all()
             print("✅ Database created successfully.")
     app.run(debug=True)
+
+
+# -------------------------------------
+# 🧠 Training Improvement Notes
+# -------------------------------------
+"""
+💡 MODEL IMPROVEMENT SUGGESTIONS (for future retraining):
+
+1️⃣ Train for more epochs:
+   - Try training the model for 15–20 epochs.
+   - This may improve accuracy, but monitor validation loss to avoid overfitting.
+
+2️⃣ Fine-tune MobileNetV2:
+   - Unfreeze some of the later convolutional layers of MobileNetV2.
+   - Retrain with a smaller learning rate (e.g., 1e-5) to capture tobacco-specific features.
+
+3️⃣ Data Augmentation:
+   - Use rotation, zoom, flipping, and brightness adjustments to increase dataset diversity.
+
+4️⃣ Early Stopping and Checkpointing:
+   - Use `EarlyStopping` and `ModelCheckpoint` to keep only the best-performing model.
+
+✅ After retraining:
+   - Save the model as `.keras` (not .h5) using `model.save("tobacco_mobilenetv2.keras")`.
+   - Replace the old file in your project and redeploy.
+"""
