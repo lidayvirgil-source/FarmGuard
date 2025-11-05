@@ -9,7 +9,7 @@ It helps farmers quickly identify leaf diseases and provides actionable treatmen
 
 ✅ **User Authentication** – Register, login, and manage your account.  
 ✅ **Disease Detection** – Upload or capture an image of a tobacco leaf.  
-✅ **ML Prediction** – Predicts possible diseases using a trained MobileNetV2 model (`tobacco_mobilenetv2.h5`).  
+✅ **ML Prediction** – Predicts possible diseases using a trained MobileNetV2 model (`tobacco_model.h5`).  
 ✅ **Recommendations** – Suggests treatment and management steps.  
 ✅ **History Tracking** – Users can view previous uploads and results.  
 ✅ **Admin Panel** – Admins can view and manage all users and predictions.  
@@ -20,12 +20,17 @@ It helps farmers quickly identify leaf diseases and provides actionable treatmen
 
 ## 🧠 Supported Disease Classes
 
-- Anthracnose  
-- Brown Spot  
-- Frog-eye Leaf Spot  
-- Tobacco Mosaic Virus  
-- Wildfire  
-- Healthy
+    Black_shank
+    Brown_spot
+    Cucumber_mosaic_virus
+    Frog_eye
+    Healthy
+    Potato_virus_Y
+    Sunscald
+    Target_spot
+    Tobacco_mosaic_virus
+    Weather_fleck
+    Wildfire
 
 ---
 

@@ -37,7 +37,6 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     histories = db.relationship("History", backref="user", lazy=True)
 
-
 class History(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(200))
@@ -46,7 +45,6 @@ class History(db.Model):
     date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
-
 # -------------------------------------
 # 🔒 Login Manager
 # -------------------------------------
@@ -54,20 +52,24 @@ class History(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-
 # -------------------------------------
 # 🧠 Load ML Model
 # -------------------------------------
-MODEL_PATH = "tobacco_mobilenetv2.keras"
+MODEL_PATH = "tobacco_model.h5"
 model = load_model(MODEL_PATH)
 
 CLASS_LABELS = [
-    "Anthracnose",
-    "Brown_Spot",
-    "Frog_eye_Leaf_Spot",
-    "Tobacco_Mosaic_Virus",
-    "Wildfire",
-    "Healthy"
+    "Black_shank",
+    "Brown_spot",
+    "Cucumber_mosaic_virus",
+    "Frog_eye",
+    "Healthy",
+    "Potato_virus_Y",
+    "Sunscald",
+    "Target_spot",
+    "Tobacco_mosaic_virus",
+    "Weather_fleck",
+    "Wildfire"
 ]
 
 # -------------------------------------
@@ -117,15 +119,19 @@ def predict_disease(image_path):
 
 def get_recommendation(label):
     recommendations = {
-        "Anthracnose": "Remove infected leaves and apply copper fungicides.",
-        "Brown_Spot": "Improve airflow, avoid moisture, use mancozeb fungicide.",
-        "Frog_eye_Leaf_Spot": "Rotate crops, remove debris, apply early fungicides.",
-        "Tobacco_Mosaic_Virus": "Remove infected plants, sanitize tools.",
-        "Wildfire": "Use copper bactericide, ensure proper spacing.",
-        "Healthy": "Plant is healthy — maintain care routine.",
+        "Black_shank": "Use crop rotation and avoid water‑logging. Remove infected plants and improve soil drainage.",
+        "Brown_spot": "Apply fungicides like Mancozeb or Copper Oxychloride. Ensure proper spacing for air flow.",
+        "Cucumber_mosaic_virus": "Control aphids and remove infected plants. Use resistant varieties if available.",
+        "Frog-eye": "Apply fungicides and avoid overhead irrigation. Remove affected leaves.",
+        "Healthy": "No disease detected. Maintain good soil fertility and avoid overwatering.",
+        "Potato_virus_Y": "Use virus‑free seedlings and control aphids. Avoid planting near potato or pepper crops.",
+        "Sunscald": "Provide partial shading and ensure proper irrigation to prevent leaf scorching.",
+        "Target_spot": "Use fungicides like Chlorothalonil. Improve air circulation and avoid leaf wetness.",
+        "Tobacco_mosaic_virus": "Disinfect tools, avoid smoking near fields, and use resistant varieties.",
+        "Weather_fleck": "Reduce exposure to air pollutants. Maintain balanced soil nutrients.",
+        "Wildfire": "Use disease‑free seeds, apply copper‑based bactericides, and avoid overhead watering."
     }
     return recommendations.get(label, "No recommendation available.")
-
 
 # -------------------------------------
 # 🌐 Routes
@@ -133,7 +139,6 @@ def get_recommendation(label):
 @app.route("/")
 def home():
     return render_template("index.html")
-
 
 # ------------------ Registration ------------------
 @app.route("/register", methods=["GET", "POST"])
@@ -157,7 +162,6 @@ def register():
 
     return render_template("register.html")
 
-
 # ------------------ Login ------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -176,7 +180,6 @@ def login():
 
     return render_template("login.html")
 
-
 # ------------------ Logout ------------------
 @app.route("/logout")
 @login_required
@@ -184,7 +187,6 @@ def logout():
     logout_user()
     flash("You have been logged out.", "info")
     return redirect(url_for("home"))
-
 
 # ------------------ Dashboard ------------------
 @app.route("/dashboard", methods=["GET", "POST"])
@@ -233,7 +235,6 @@ def dashboard():
     histories = History.query.filter_by(user_id=current_user.id).order_by(History.date.desc()).all()
     return render_template("dashboard.html", histories=histories)
 
-
 # ------------------ Delete History ------------------
 @app.route("/delete_record/<int:record_id>")
 @login_required
@@ -248,7 +249,6 @@ def delete_record(record_id):
     flash("Record deleted successfully.", "success")
     return redirect(url_for("dashboard"))
 
-
 # ------------------ Admin Dashboard ------------------
 @app.route("/admin")
 @login_required
@@ -260,7 +260,6 @@ def admin_dashboard():
     records = History.query.all()
     users = User.query.all()
     return render_template("admin.html", records=records, users=users)
-
 
 # ------------------ Admin Delete User ------------------
 @app.route("/admin/delete_user/<int:user_id>")
@@ -282,12 +281,10 @@ def delete_user(user_id):
     flash(f"User '{user.username}' deleted successfully.", "success")
     return redirect(url_for("admin_dashboard"))
 
-
 # ------------------ Uploaded Image Access ------------------
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
-
 
 # -------------------------------------
 # 🚀 Run Server
@@ -298,29 +295,3 @@ if __name__ == "__main__":
             db.create_all()
             print("✅ Database created successfully.")
     app.run(debug=True)
-
-
-# -------------------------------------
-# 🧠 Training Improvement Notes
-# -------------------------------------
-"""
-💡 MODEL IMPROVEMENT SUGGESTIONS (for future retraining):
-
-1️⃣ Train for more epochs:
-   - Try training the model for 15–20 epochs.
-   - This may improve accuracy, but monitor validation loss to avoid overfitting.
-
-2️⃣ Fine-tune MobileNetV2:
-   - Unfreeze some of the later convolutional layers of MobileNetV2.
-   - Retrain with a smaller learning rate (e.g., 1e-5) to capture tobacco-specific features.
-
-3️⃣ Data Augmentation:
-   - Use rotation, zoom, flipping, and brightness adjustments to increase dataset diversity.
-
-4️⃣ Early Stopping and Checkpointing:
-   - Use `EarlyStopping` and `ModelCheckpoint` to keep only the best-performing model.
-
-✅ After retraining:
-   - Save the model as `.keras` (not .h5) using `model.save("tobacco_mobilenetv2.keras")`.
-   - Replace the old file in your project and redeploy.
-"""

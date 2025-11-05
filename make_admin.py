@@ -1,7 +1,7 @@
 from app import db, User
 
 # 🧑‍🌾 Change this to your email address that you used to register
-email = "your_email_here@example.com"
+email = "virgilliday53@gmail.com"
 
 user = User.query.filter_by(email=email).first()
 if user:
