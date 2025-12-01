@@ -1,2 +1,2 @@
-[build]
-builder = "python:3.10"
+[deploy]
+startCommand = "gunicorn app:app"
